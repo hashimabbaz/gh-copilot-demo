@@ -44,7 +44,7 @@ namespace UnsecureApp.Controllers
             try
             {
                 object o = null;
-                o.ToString();
+                o!.ToString();
             }
             catch (Exception e)
             {

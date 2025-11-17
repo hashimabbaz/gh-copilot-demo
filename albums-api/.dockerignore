@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/out/
+**/.vs/
+**/.vscode/
+**/node_modules/
+**/album-viewer/node_modules/
+**/album-viewer/dist/
+**/.git/
+**/.github/
+**/README.md
+**/NuGet.Config
+**/*.log
+**/Dockerfile*
+**/docker-compose*.yml

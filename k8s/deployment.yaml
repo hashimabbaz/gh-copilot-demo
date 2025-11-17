@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: album-api
+  labels:
+    app: album-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: album-api
+  template:
+    metadata:
+      labels:
+        app: album-api
+    spec:
+      containers:
+      - name: album-api
+        image: placeholder/album-api:latest  # This will be replaced by the workflow
+        ports:
+        - containerPort: 80
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_URLS
+          value: "http://+:80"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /albums
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /albums
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5

@@ -1,0 +1,136 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: album-viewer/package-lock.json
+
+    - name: Restore .NET dependencies
+      run: dotnet restore albums-api/albums-api.csproj
+
+    - name: Build .NET project
+      run: dotnet build albums-api/albums-api.csproj --configuration Release --no-restore
+
+    - name: Run .NET tests
+      run: dotnet test albums-api/albums-api.csproj --configuration Release --no-build --verbosity normal
+
+    - name: Install frontend dependencies
+      run: |
+        cd album-viewer
+        npm ci
+
+    - name: Type check frontend
+      run: |
+        cd album-viewer
+        npm run type-check
+
+    - name: Build frontend
+      run: |
+        cd album-viewer
+        npm run build
+
+    - name: Publish .NET project
+      run: dotnet publish albums-api/albums-api.csproj --configuration Release --output ./publish
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: published-app
+        path: ./publish/
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./albums-api/Dockerfile
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/album-api:${{ github.run_id }},${{ secrets.DOCKERHUB_USERNAME }}/album-api:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test the Docker image
+      run: |
+        # Pull the image we just pushed
+        docker pull ${{ secrets.DOCKERHUB_USERNAME }}/album-api:latest
+        
+        # Run the container in background
+        docker run -d --name album-api-test -p 8080:80 ${{ secrets.DOCKERHUB_USERNAME }}/album-api:latest
+        
+        # Wait for the application to start
+        sleep 10
+        
+        # Test the health endpoint
+        curl -f http://localhost:8080/albums || exit 1
+        
+        # Test getting all albums
+        response=$(curl -s http://localhost:8080/albums)
+        if [ -z "$response" ]; then
+          echo "No response from API"
+          exit 1
+        fi
+        
+        # Test getting a specific album
+        curl -f http://localhost:8080/albums/1 || exit 1
+        
+        # Test sorted albums endpoint
+        curl -f "http://localhost:8080/albums/sorted?sortBy=name" || exit 1
+        
+        # Clean up
+        docker stop album-api-test
+        docker rm album-api-test
+        
+        echo "All container tests passed!"
+
+    - name: Deploy to AKS Dev Cluster
+      uses: azure/aks-set-context@v3
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+        resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+
+    - name: Deploy to Kubernetes
+      run: |
+        # Create namespace if it doesn't exist
+        kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Update the deployment with the new image
+        sed -i 's|image:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/album-api:${{ github.run_id }}|g' k8s/deployment.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f k8s/ -n dev
+        
+        # Wait for deployment to be ready
+        kubectl wait --for=condition=available --timeout=300s deployment/album-api -n dev
+        
+        # Get service external IP
+        kubectl get services -n dev

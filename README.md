@@ -117,3 +117,56 @@ If you need to change these settings, you can modify:
 ### Alternative: GitHub Codespaces
 
 The easiest way is to open this solution in a GitHub Codespace, or run it locally in a devcontainer. The development environment will be automatically configured for you.
+
+## Deployment
+
+### Docker Container
+
+The Album API can be containerized using Docker. A multi-stage Dockerfile is provided in the `albums-api` directory.
+
+#### Building the Docker Image Locally
+
+```bash
+cd albums-api
+docker build -t album-api .
+docker run -p 8080:80 album-api
+```
+
+#### Docker Hub Deployment
+
+The GitHub Actions workflow automatically builds and pushes the Docker image to Docker Hub on every push to the main branch.
+
+##### Required GitHub Secrets
+
+To enable Docker Hub deployment, configure the following secrets in your GitHub repository:
+
+- `DOCKERHUB_USERNAME`: Your Docker Hub username
+- `DOCKERHUB_TOKEN`: Docker Hub access token (recommended) or password
+
+##### Docker Hub Setup
+
+1. Create a Docker Hub account at https://hub.docker.com/
+2. Generate an access token in your Docker Hub account settings
+3. Add the credentials as GitHub secrets
+
+##### AKS Deployment Setup
+
+To enable deployment to Azure Kubernetes Service (AKS), configure these additional secrets:
+
+- `AZURE_CREDENTIALS`: Azure service principal credentials (JSON format)
+- `AKS_CLUSTER_NAME`: Your AKS cluster name
+- `AKS_RESOURCE_GROUP`: Resource group containing the AKS cluster
+
+##### Azure Setup
+
+1. Create an AKS cluster
+2. Create a service principal with cluster admin permissions:
+   ```bash
+   az ad sp create-for-rbac --name "aks-deploy" --scopes /subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.ContainerService/managedClusters/<cluster-name> --role Contributor
+   ```
+3. Add the service principal credentials as GitHub secrets
+
+The workflow will:
+- Tag images with both the GitHub run ID and `latest`
+- Run container tests to verify the image works
+- Deploy to the dev AKS cluster automatically
