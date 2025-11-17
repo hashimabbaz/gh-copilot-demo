@@ -12,12 +12,12 @@ interface SalesData {
 // x-axis are the month series and y-axis show the numbers of albums sold
 // data from the sales of album are loaded in from an external source and are in json format
 export async function generateAlbumSalesChart(
-//   containerId: string,
+  containerId: string,
   dataSource: string
 ): Promise<void> {
   try {
     // Load data from external JSON source
-    const data: SalesData[] = await d3.json(dataSource);
+    const data = await d3.json<SalesData[]>(dataSource);
 
     if (!data || data.length === 0) {
       console.error('No data available');
