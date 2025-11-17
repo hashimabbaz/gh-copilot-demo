@@ -1,0 +1,25 @@
+﻿@model IEnumerable<album_viewer_aspnet.Models.Album>
+
+@{
+    ViewData["Title"] = "Albums";
+}
+
+<div class="container">
+    <h1 class="text-center">Albums</h1>
+    <div class="row">
+        @foreach (var album in Model)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <img src="@album.Image_url" class="card-img-top" alt="@album.Title">
+                    <div class="card-body">
+                        <h5 class="card-title">@album.Title</h5>
+                        <p class="card-text">Artist: @album.Artist</p>
+                        <p class="card-text">Year: @album.Year</p>
+                        <p class="card-text">Price: $@album.Price</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
